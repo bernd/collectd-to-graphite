@@ -8,6 +8,7 @@
  * LoadPlugin write_http
  * <Plugin write_http>
  *   <URL "http://monitor:3012/post-collectd">
+ *     Format "JSON"
  *   </URL>
  * </Plugin>
  *
