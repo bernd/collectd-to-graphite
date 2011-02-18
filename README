@@ -10,6 +10,7 @@ In collectd.conf, put this:
 
 <Plugin write_http>
   <URL "http://monitor:3012/post-collectd">
+    Format "JSON"
   </URL>
 </Plugin>
 
