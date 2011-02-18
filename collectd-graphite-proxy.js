@@ -32,28 +32,42 @@ graphite_connection.on("error", function() {
   throw new Error("Connection error");
 });
 
-var request_handler = function(request, response) {
-  var putval_re = /^PUTVAL ([^ ]+)(?: ([^ ]+=[^ ]+)?) ([0-9]+)(:(?:-?[0-9.]+)+)/;
-  request.addListener("data", function(chunk) {
-    metrics = chunk.toString().split("\n")
-    for (var i in metrics) {
-      var m = putval_re.exec(metrics[i]);
-      if (!m) {
-        continue;
-      }
-      var name = m[1];
-      var options = m[2];
-      var time = m[3];
-      var value = m[4].replace(/:/, "");
+var data_name = function(data, data_instance) {
+  if (data_instance.length > 1) {
+    return data + '-' + data_instance;
+  } else {
+    return data;
+  }
+}
 
-      name = "collectd." + name.replace(/\./g, "_").replace(/\//g, ".");
-      message = [name, value, time].join(" ")
-      console.log(message)
-      graphite_connection.write(message + "\n");
-    }
+var write_message = function(name, value, time) {
+  console.log([name, value, time].join(' '));
+  graphite_connection.write([name, value, time].join(' ') + "\n");
+}
+
+var request_handler = function(request, response) {
+  var payload = '';
+
+  request.addListener("data", function(chunk) {
+    payload += chunk.toString();
   });
 
   request.addListener("end", function() {
+    JSON.parse(payload).forEach(function(entry) {
+      var plugin = data_name(entry.plugin, entry.plugin_instance),
+          type = data_name(entry.type, entry.type_instance),
+          hostname = entry.host.replace(/\./g, '_'),
+          name = ['collectd', hostname, plugin, type].join('.');
+
+      if (entry.dsnames.length > 1) {
+        for (var i in entry.dsnames) {
+          write_message(name + '_' +  entry.dsnames[i], entry.values[i], entry.time);
+        }
+      } else {
+        write_message(name, entry.values[0], entry.time);
+      }
+    });
+
     response.writeHead(200, {"Content-Type": "text/plain"});
     response.write("OK");
     response.end();
